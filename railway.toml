@@ -1,0 +1,15 @@
+# ══════════════════════════════════════════
+#   ملف إعدادات Railway
+# ══════════════════════════════════════════
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "python bot.py"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+# متغيرات البيئة - أضفها من لوحة تحكم Railway
+# لا تضع القيم الحقيقية هنا!
