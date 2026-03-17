@@ -1,113 +1,135 @@
 """
 🤖 بوت تيليجرام متكامل لإدارة المجموعات
-المطور: قم بتعديل إعدادات المطور في ملف config.py
-المكتبات: Pyrogram 2.0 + Motor (MongoDB) + PyGalls
+المكتبة: python-telegram-bot v20 (Webhook + Asyncio)
+قاعدة البيانات: Motor (MongoDB)
 """
 
 import asyncio
 import logging
 import sys
-from pyrogram import Client, idle
-from config import Config
-from database import db
-from handlers import (
-    admin_handlers,
-    welcome_handlers,
-    interactive_handlers,
-    calls_handlers,
+import os
+
+from telegram import Update
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    ChatMemberHandler,
+    filters,
 )
 
+from config import Config
+from database import db
+from handlers import admin, welcome, interactive, calls
+
 # ══════════════════════════════════════════
-#           إعداد التسجيل (Logging)
+#           إعداد التسجيل
 # ══════════════════════════════════════════
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    stream=sys.stdout,   # ← مهم: يرسل اللوق لـ Railway مباشرة
+    stream=sys.stdout,
 )
 logger = logging.getLogger(__name__)
 
 
 # ══════════════════════════════════════════
-#           التحقق من المتغيرات البيئية
+#           تسجيل جميع المعالجات
 # ══════════════════════════════════════════
-def check_config():
-    """التحقق من وجود جميع المتغيرات المطلوبة"""
-    missing = []
+def register_handlers(app: Application):
+    # ── الإدارة ──
+    app.add_handler(CommandHandler("ban",    admin.ban_handler))
+    app.add_handler(CommandHandler("unban",  admin.unban_handler))
+    app.add_handler(CommandHandler("mute",   admin.mute_handler))
+    app.add_handler(CommandHandler("unmute", admin.unmute_handler))
+    app.add_handler(CommandHandler("banlist",admin.banlist_handler))
 
-    if not Config.API_ID or Config.API_ID == 12345678:
-        missing.append("API_ID")
-    if not Config.API_HASH or Config.API_HASH == "your_api_hash_here":
-        missing.append("API_HASH")
-    if not Config.BOT_TOKEN or Config.BOT_TOKEN == "your_bot_token_here":
-        missing.append("BOT_TOKEN")
+    # ── عامة ──
+    app.add_handler(CommandHandler("start",  interactive.start_handler))
+    app.add_handler(CommandHandler("help",   interactive.help_handler))
+    app.add_handler(CommandHandler("ping",   interactive.ping_handler))
+    app.add_handler(CommandHandler("info",   interactive.info_handler))
+    app.add_handler(CommandHandler("id",     interactive.id_handler))
+    app.add_handler(CommandHandler("rules",  welcome.rules_handler))
 
-    if missing:
-        logger.error(f"❌ المتغيرات التالية مفقودة أو لم تُعدَّل: {', '.join(missing)}")
-        logger.error("⚠️  أضف هذه المتغيرات في Railway → Variables")
-        sys.exit(1)
+    # ── المكالمات ──
+    app.add_handler(CommandHandler("joincall",   calls.join_call_handler))
+    app.add_handler(CommandHandler("leavecall",  calls.leave_call_handler))
 
-    logger.info("✅ جميع المتغيرات البيئية موجودة")
+    # ── الترحيب بالأعضاء الجدد ──
+    app.add_handler(MessageHandler(
+        filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome.welcome_handler
+    ))
+    app.add_handler(MessageHandler(
+        filters.StatusUpdate.LEFT_CHAT_MEMBER, welcome.farewell_handler
+    ))
 
+    # ── الأزرار ──
+    app.add_handler(CallbackQueryHandler(welcome.callback_handler))
 
-# ══════════════════════════════════════════
-#           إنشاء تطبيق البوت
-# ══════════════════════════════════════════
-app = Client(
-    name="group_manager_bot",
-    api_id=Config.API_ID,
-    api_hash=Config.API_HASH,
-    bot_token=Config.BOT_TOKEN,
-)
+    # ── الردود الذكية على الكلمات ──
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex(r"(?i)المطور|developer"), interactive.reply_developer
+    ))
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex(r"(?i)مساعدة|help me"), interactive.reply_help
+    ))
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex(r"(?i)القوانين|الرولز|rules"), welcome.rules_text_handler
+    ))
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex(r"(?i)السلام|سلام|هلا|مرحبا|مرحباً|صباح|مساء"), interactive.reply_greeting
+    ))
 
-
-async def main():
-    """الدالة الرئيسية لتشغيل البوت"""
-
-    # التحقق من الإعدادات أولاً
-    check_config()
-
-    logger.info("🚀 جاري تشغيل البوت...")
-
-    # الاتصال بقاعدة البيانات
-    try:
-        await db.connect()
-        logger.info("✅ تم الاتصال بقاعدة البيانات MongoDB")
-    except Exception as e:
-        logger.error(f"❌ فشل الاتصال بـ MongoDB: {e}")
-        logger.warning("⚠️  البوت سيعمل بدون قاعدة بيانات")
-
-    # تسجيل جميع المعالجات
-    admin_handlers.register(app)
-    welcome_handlers.register(app)
-    interactive_handlers.register(app)
-    calls_handlers.register(app)
     logger.info("✅ تم تسجيل جميع المعالجات")
 
-    # تهيئة PyGalls (هيكل أساسي)
-    await calls_handlers.initialize_calls(app)
 
-    # تشغيل البوت والانتظار
-    await app.start()
-    me = await app.get_me()
-    logger.info(f"🤖 البوت يعمل الآن: @{me.username} (ID: {me.id})")
-    logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+# ══════════════════════════════════════════
+#           الدالة الرئيسية
+# ══════════════════════════════════════════
+async def post_init(app: Application):
+    """تُشغَّل بعد تهيئة التطبيق"""
+    await db.connect()
+    logger.info("✅ تم الاتصال بـ MongoDB")
+    await calls.initialize_calls()
+    logger.info("🤖 البوت جاهز ويستقبل الرسائل عبر Webhook")
 
-    # idle() هي الطريقة الصحيحة للإبقاء على البوت يعمل في Pyrogram
-    await idle()
 
-    # عند الإيقاف
-    await app.stop()
+async def post_shutdown(app: Application):
+    """تُشغَّل عند الإيقاف"""
     await db.close()
-    logger.info("🛑 تم إيقاف البوت بنجاح")
+    logger.info("🛑 تم إيقاف البوت")
+
+
+def main():
+    # التحقق من المتغيرات
+    if not Config.BOT_TOKEN:
+        logger.error("❌ BOT_TOKEN مفقود!")
+        sys.exit(1)
+
+    # بناء التطبيق
+    app = (
+        Application.builder()
+        .token(Config.BOT_TOKEN)
+        .post_init(post_init)
+        .post_shutdown(post_shutdown)
+        .build()
+    )
+
+    # تسجيل المعالجات
+    register_handlers(app)
+
+    # تشغيل عبر Webhook
+    logger.info(f"🚀 تشغيل Webhook على المنفذ {Config.PORT}")
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=Config.PORT,
+        webhook_url=f"{Config.WEBHOOK_URL}/webhook",
+        url_path="/webhook",
+        drop_pending_updates=True,
+    )
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("🛑 تم إيقاف البوت")
-    except Exception as e:
-        logger.exception(f"❌ خطأ غير متوقع: {e}")
-        sys.exit(1)
+    main()

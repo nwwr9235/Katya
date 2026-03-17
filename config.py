@@ -1,39 +1,36 @@
 """
-⚙️ ملف الإعدادات - قم بتعديل القيم حسب بياناتك
+⚙️ ملف الإعدادات
 """
-
 import os
-from dataclasses import dataclass
 
 
-@dataclass
 class Config:
     # ══════════════════════════════════════════
-    #   إعدادات تيليجرام - احصل عليها من my.telegram.org
+    #   تيليجرام - من @BotFather
     # ══════════════════════════════════════════
-    API_ID: int = int(os.environ.get("API_ID", 12345678))
-    API_HASH: str = os.environ.get("API_HASH", "your_api_hash_here")
-    BOT_TOKEN: str = os.environ.get("BOT_TOKEN", "your_bot_token_here")
+    BOT_TOKEN: str = os.environ.get("BOT_TOKEN", "")
 
     # ══════════════════════════════════════════
-    #   إعدادات المطور
+    #   Webhook - يُعبأ تلقائياً من Railway
     # ══════════════════════════════════════════
-    DEVELOPER_NAME: str = os.environ.get("DEVELOPER_NAME", "أحمد المطور")
-    DEVELOPER_USERNAME: str = os.environ.get("DEVELOPER_USERNAME", "developer")
-    DEVELOPER_LINK: str = os.environ.get(
-        "DEVELOPER_LINK", "https://t.me/developer"
-    )
+    WEBHOOK_URL: str = os.environ.get("WEBHOOK_URL", "")
+    PORT: int = int(os.environ.get("PORT", 8080))
 
     # ══════════════════════════════════════════
-    #   إعدادات قاعدة البيانات MongoDB
+    #   المطور
     # ══════════════════════════════════════════
-    MONGO_URI: str = os.environ.get(
-        "MONGO_URI", "mongodb://localhost:27017"
-    )
-    DB_NAME: str = os.environ.get("DB_NAME", "telegram_bot_db")
+    DEVELOPER_NAME: str     = os.environ.get("DEVELOPER_NAME", "المطور")
+    DEVELOPER_USERNAME: str = os.environ.get("DEVELOPER_USERNAME", "username")
+    DEVELOPER_LINK: str     = os.environ.get("DEVELOPER_LINK", "https://t.me/username")
 
     # ══════════════════════════════════════════
-    #   إعدادات المجموعة
+    #   MongoDB
+    # ══════════════════════════════════════════
+    MONGO_URI: str = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
+    DB_NAME: str   = os.environ.get("DB_NAME", "telegram_bot_db")
+
+    # ══════════════════════════════════════════
+    #   قوانين المجموعة
     # ══════════════════════════════════════════
     GROUP_RULES: str = """
 📋 **قوانين المجموعة:**
